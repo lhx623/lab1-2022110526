@@ -13,7 +13,7 @@ class DirectedGraph {
     private final Map<String, Map<String, Integer>> adjList;
     // Store frequency of each word (node)
     private Map<String, Integer> nodeFrequencies;
-    // Total words in the source text for TF calculation
+    // Total words in the source text for TF/TF-IDF calculation
     private long totalWordCount;
 
     /** Constructor */
@@ -100,7 +100,7 @@ class DirectedGraph {
     }
 
     // --- Shortest Path Algorithms ---
-
+    // ... (Shortest path methods remain unchanged) ...
     /** Finds ONE shortest path using Dijkstra's algorithm. */
     public ShortestPathResult findShortestPath(String startNode, String endNode) {
         if (!containsNode(startNode) || !containsNode(endNode)) return null;
@@ -206,10 +206,6 @@ class DirectedGraph {
             int edgeWeight = neighborEntry.getValue();
 
             // Explore neighbor 'v' only if it could potentially lead to *a* shortest path.
-            // This check ensures we are moving towards the target along valid path segments.
-            // distance(start, u) + weight(u, v) + estimate(v, end) >= shortestLength
-            // A simple check: distance(start, u) + weight(u, v) == distance(start, v) calculated by Dijkstra
-            // This confirms this edge is part of at least one shortest path found by Dijkstra.
             if (distances.get(u) != Integer.MAX_VALUE && distances.get(v) != Integer.MAX_VALUE &&
                     distances.get(u) + edgeWeight == distances.get(v))
             {
@@ -217,8 +213,6 @@ class DirectedGraph {
                 findAllPathsDFS(v, endNode, distances, currentPath, allPaths, currentWeight + edgeWeight, targetWeight);
                 currentPath.removeLast(); // Backtrack
             }
-            // Note: Simpler DFS without distance check might explore non-shortest paths.
-            // Relying on Dijkstra's distances guides the DFS efficiently.
         }
     }
 
@@ -292,7 +286,6 @@ class DirectedGraph {
         return new ShortestPathResult(path, length);
     }
 
-
     // --- Helper Records for Path Results ---
     public record ShortestPathResult(List<String> path, int length) {
         public List<String> getPath() { return Collections.unmodifiableList(path); } // Return unmodifiable list
@@ -307,33 +300,41 @@ class DirectedGraph {
         public int getLength() { return length; }
     }
 
+
     // --- PageRank Implementation ---
 
-    /** Calculates PageRank using iteration. Allows TF-based initial rank. */
-    public Map<String, Double> calculatePageRank(double dampingFactor, boolean useTfBasedInitialRank) {
+    /**
+     * Calculates PageRank using iteration. Allows uniform or TF-IDF-based initial rank.
+     * @param dampingFactor The damping factor (typically 0.85).
+     * @param useTfIdfBasedInitialRank If true, initializes ranks based on TF-IDF; otherwise, uses uniform initialization.
+     * @return A map where keys are node names (words) and values are their PageRank scores.
+     */
+    public Map<String, Double> calculatePageRank(double dampingFactor, boolean useTfIdfBasedInitialRank) {
         Map<String, Double> ranks = new HashMap<>();
         Map<String, Integer> outDegree = new HashMap<>();
         Set<String> nodes = getNodes();
         int n = nodes.size();
         if (n == 0) return ranks;
 
-        initializeRanks(ranks, n, useTfBasedInitialRank);
+        // Initialize ranks based on the chosen method (Uniform or TF-IDF)
+        initializeRanks(ranks, n, useTfIdfBasedInitialRank); // <--- MODIFIED CALL
 
-        // 预计算出度
+        // Pre-calculate out-degrees for efficiency
         for (String node : nodes) {
             outDegree.put(node, getNeighbors(node).size());
         }
 
         Map<String, Double> newRanks = new HashMap<>();
-        double epsilon = 1e-6;         // 收敛误差阈值
+        double epsilon = 1e-6;         // Convergence threshold
         int maxIterations = 100;
         int iteration = 0;
 
         while (iteration++ < maxIterations) {
-            double delta = 0.0;
-            double sinkSum = 0.0;
+            double delta = 0.0; // Sum of changes in this iteration
+            double sinkSum = 0.0; // Sum of ranks of sink nodes (out-degree 0)
 
-            // 处理“死节点”的权重补偿
+            // Calculate the contribution from sink nodes (nodes with no outgoing links)
+            // This ensures their rank is distributed among all nodes
             for (String node : nodes) {
                 if (outDegree.getOrDefault(node, 0) == 0) {
                     sinkSum += ranks.get(node);
@@ -341,94 +342,99 @@ class DirectedGraph {
             }
 
             for (String node : nodes) {
-                double sum = 0.0;
+                double incomingRankSum = 0.0;
 
-                // 遍历所有可能指向 node 的节点
+                // Sum ranks from nodes pointing to the current node
                 for (String other : nodes) {
+                    // Check if 'other' node points to the current 'node'
                     if (getNeighbors(other).containsKey(node)) {
-                        sum += ranks.get(other) / outDegree.get(other);
+                        int otherOutDegree = outDegree.get(other);
+                        if (otherOutDegree > 0) { // Avoid division by zero (shouldn't happen with pre-calc)
+                            incomingRankSum += ranks.get(other) / otherOutDegree;
+                        }
                     }
                 }
 
-                // PageRank 核心公式（含“死节点”补偿）
+                // PageRank formula: (1-d)/N + d * (Sum(IncomingPR/OutgoingLinks) + SinkSum/N)
                 double newRank = (1 - dampingFactor) / n +
-                        dampingFactor * (sum + sinkSum / n);
+                        dampingFactor * (incomingRankSum + sinkSum / n); // Distribute sink rank equally
 
                 newRanks.put(node, newRank);
                 delta += Math.abs(newRank - ranks.get(node));
             }
 
+            // Update ranks for the next iteration
             ranks.putAll(newRanks);
 
+            // Check for convergence
             if (delta < epsilon) {
                 System.out.println("PageRank converged after " + iteration + " iterations.");
-                break;
+                break; // Exit loop if converged
             }
+        }
+        if (iteration >= maxIterations) {
+            System.out.println("PageRank did not converge within " + maxIterations + " iterations.");
         }
 
         return ranks;
     }
 
 
-    // Helper: Initialize ranks (Uniform or TF-based)
-    private void initializeRanks(Map<String, Double> ranks, int n, boolean useTf) {
-        if (useTf && totalWordCount > 0 && nodeFrequencies != null && !nodeFrequencies.isEmpty()) {
-            double totalTf = 0;
-            Map<String, Double> tfRanks = new HashMap<>();
+    // Helper: Initialize ranks (Uniform or TF-IDF based)
+    private void initializeRanks(Map<String, Double> ranks, int n, boolean useTfIdf) {
+        // Attempt TF-IDF initialization if requested and data is available
+        if (useTfIdf && totalWordCount > 0 && nodeFrequencies != null && !nodeFrequencies.isEmpty()) {
+            Map<String, Double> tfIdfScores = new HashMap<>();
+            double totalTfIdf = 0;
+
+            // Calculate TF-IDF for each node (word)
             for (String node : getNodes()) {
-                double tf = (double) getNodeFrequency(node) / totalWordCount;
-                tfRanks.put(node, tf);
-                totalTf += tf;
+                int frequency = getNodeFrequency(node);
+                if (frequency == 0) continue; // Should not happen for nodes in getNodes() if populated correctly
+
+                // Calculate TF (Term Frequency)
+                double tf = (double) frequency / totalWordCount;
+
+                // Calculate IDF (Inverse Document Frequency - Local Heuristic)
+                // log(TotalTerms / (TermFrequency + 1))
+                double idf = Math.log((double) totalWordCount / (frequency + 1.0)); // Add 1 to freq to avoid log(inf) or div by zero
+
+                // Calculate TF-IDF
+                double tfIdfScore = tf * idf;
+
+                tfIdfScores.put(node, tfIdfScore);
+                totalTfIdf += tfIdfScore;
             }
-            if (totalTf > 0) {
-                // Normalize TF values to sum to 1
+
+            // Normalize TF-IDF scores to sum to 1 for initial rank distribution
+            if (totalTfIdf > 0) {
                 for (String node : getNodes()) {
-                    ranks.put(node, tfRanks.get(node) / totalTf);
+                    // Get the calculated TF-IDF score, default to 0 if node somehow wasn't processed
+                    double nodeTfIdf = tfIdfScores.getOrDefault(node, 0.0);
+                    ranks.put(node, nodeTfIdf / totalTfIdf); // Normalize
                 }
-                System.out.println("Initialized PageRank using Term Frequency.");
-                return; // Exit after successful TF initialization
+                System.out.println("Initialized PageRank using TF-IDF (single-document heuristic).");
+                return; // Exit after successful TF-IDF initialization
             } else {
-                System.out.println("Warning: TF sum was zero, falling back to uniform initial PageRank.");
+                System.out.println("Warning: TF-IDF sum was zero or negative (check frequencies/total count). Falling back to uniform initial PageRank.");
             }
         }
-        // Default: Uniform initialization
+
+        // Default or Fallback: Uniform initialization
+        System.out.println("Using uniform initial PageRank.");
         double initialRank = 1.0 / n;
         for (String node : getNodes()) {
             ranks.put(node, initialRank);
         }
-        if(useTf) System.out.println("Warning: Could not use TF-based initial rank (check frequencies/total count). Using uniform.");
-
-    }
-
-    // Helper: Calculate sum of ranks for sink nodes
-    private double calculateSinkRankSum(Map<String, Double> ranks, Map<String, Integer> outDegree) {
-        double sinkSum = 0;
-        for (Map.Entry<String, Integer> entry : outDegree.entrySet()) {
-            if (entry.getValue() == 0) { // Node is a sink
-                sinkSum += ranks.get(entry.getKey());
-            }
+        // Add a warning if TF-IDF was requested but couldn't be used
+        if (useTfIdf && !(totalWordCount > 0 && nodeFrequencies != null && !nodeFrequencies.isEmpty())) {
+            System.out.println("Warning: Could not use TF-IDF-based initial rank (totalWordCount or frequencies missing). Using uniform.");
         }
-        return sinkSum;
-    }
-
-    // Helper: Calculate rank contribution from incoming links
-    private double calculateRankFromInputs(String targetNode, Map<String, Double> ranks, Map<String, Integer> outDegree) {
-        double rankSum = 0;
-        // Find nodes that link *to* targetNode
-        for (String sourceNode : getNodes()) {
-            if (getNeighbors(sourceNode).containsKey(targetNode)) {
-                int sourceOutDegree = outDegree.get(sourceNode);
-                if (sourceOutDegree > 0) {
-                    rankSum += ranks.get(sourceNode) / sourceOutDegree;
-                }
-            }
-        }
-        return rankSum;
     }
 
 
     // --- Random Walk Implementation ---
-
+    // ... (Random Walk method remains unchanged) ...
     /** Performs a random walk until an edge is repeated or a dead end is hit. */
     public List<String> performRandomWalk() {
         List<String> pathNodes = new ArrayList<>();
@@ -469,7 +475,7 @@ class DirectedGraph {
 
 
     // --- Graph Output Methods ---
-
+    // ... (Output methods remain unchanged) ...
     /** Generates a string representation for CLI display. */
     @Override
     public String toString() {

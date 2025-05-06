@@ -14,6 +14,7 @@ public class Lab1 {
     private static DirectedGraph graph;
     // private static String originalTextContent; // Store preprocessed text if needed elsewhere
 
+    // ... (main method and other parts up to handleCalcPageRank remain the same) ...
     public static void main(String[] args) {
         // --- 1. 获取输入文件路径 ---
         String filePath = "";
@@ -67,7 +68,7 @@ public class Lab1 {
                             handleCalcAllShortestPaths(scanner);
                             break;
                         case 6:
-                            handleCalcPageRank(scanner);
+                            handleCalcPageRank(scanner); // MODIFIED CALL HERE
                             break;
                         case 7:
                             handleRandomWalk();
@@ -107,8 +108,7 @@ public class Lab1 {
         }
     }
 
-    // --- 菜单和输入处理辅助方法 (Updated Menu Display) ---
-
+    // ... (displayMenu, handleSaveGraphAsImage, etc., remain the same) ...
     private static void displayMenu() {
         System.out.println("\n========== Lab 1 Menu ==========");
         System.out.println(" 1. Show Directed Graph (CLI)");
@@ -169,29 +169,38 @@ public class Lab1 {
         System.out.println(calcAllShortestPaths(word1, word2));
     }
 
+
+    // MODIFIED: Handler for PageRank calculation
     private static void handleCalcPageRank(Scanner scanner) {
         System.out.print("Enter word for PageRank (leave blank for all): ");
         String wordInput = scanner.nextLine().toLowerCase();
-        boolean useTfPr = false;
-        System.out.print("Use Term Frequency for initial PageRank? (yes/no, default no): ");
-        String tfChoice = scanner.nextLine().toLowerCase();
-        if (tfChoice.equals("yes")) {
-            useTfPr = true;
+
+        // Ask user whether to use TF-IDF for initialization
+        boolean useTfIdfPr = false;
+        System.out.print("Use TF-IDF for initial PageRank? (yes/no, default no): "); // <--- MODIFIED PROMPT
+        String tfIdfChoice = scanner.nextLine().toLowerCase();
+        if (tfIdfChoice.equals("yes")) {
+            useTfIdfPr = true;
         }
-        Map<String, Double> pageRanks = calPageRank(useTfPr);
+
+        // Call the PageRank calculation method with the flag
+        Map<String, Double> pageRanks = calPageRank(useTfIdfPr); // <--- MODIFIED CALL
+
         if (pageRanks != null) {
             if (wordInput.isEmpty()) {
                 System.out.println("\n--- PageRank Results (Top 20) ---");
                 pageRanks.entrySet().stream()
                         .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                         .limit(20)
-                        .forEach(entry -> System.out.printf("%-15s: %.6f%n", entry.getKey(), entry.getValue())); // Adjusted format
+                        .forEach(entry -> System.out.printf("%-15s: %.6f%n", entry.getKey(), entry.getValue()));
                 System.out.println("---------------------------------");
             } else if (pageRanks.containsKey(wordInput)) {
                 System.out.printf("PageRank for \"%s\": %.6f%n", wordInput, pageRanks.get(wordInput));
             } else {
                 System.out.println("Word \"" + wordInput + "\" not found in graph.");
             }
+        } else {
+            System.out.println("PageRank calculation failed or graph was empty.");
         }
     }
 
@@ -199,6 +208,7 @@ public class Lab1 {
         System.out.println("Starting random walk...");
         System.out.println(randomWalk());
     }
+
 
     // --- 文件读取和预处理 (Same as before) ---
     private static String readFileAndPreprocess(String filePath) throws IOException {
@@ -236,13 +246,15 @@ public class Lab1 {
             String word2 = wordList.get(i + 1);
             newGraph.addEdge(word1, word2);
         }
+        // Ensure the last word is added as a node if it wasn't already a source
         if (!wordList.isEmpty()) {
             newGraph.addNode(wordList.get(wordList.size() - 1));
         }
         return newGraph;
     }
 
-    // --- 功能实现 (Core logic calls graph methods - mostly same as before) ---
+
+    // --- 功能实现 (Core logic calls graph methods) ---
 
     /** Function 2: Show Directed Graph */
     public static void showDirectedGraph(DirectedGraph G) {
@@ -255,7 +267,7 @@ public class Lab1 {
         System.out.println("-------------------------------------------");
     }
 
-    // --- queryBridgeWords, generateNewText, calcShortestPath, calcAllShortestPaths, calPageRank, randomWalk methods remain the same as previous version ---
+    // ... (queryBridgeWords, generateNewText, calcShortestPath, calcAllShortestPaths remain the same) ...
     /** Function 3: Query Bridge Words */
     public static String queryBridgeWords(String word1, String word2) {
         if (graph == null) return "Graph not initialized.";
@@ -422,15 +434,17 @@ public class Lab1 {
     }
 
 
-    /** Function 6 + Optional: Calculate PageRank */
-    public static Map<String, Double> calPageRank(boolean useTfBasedInitialRank) {
+    // MODIFIED: Wrapper for PageRank calculation call
+    public static Map<String, Double> calPageRank(boolean useTfIdfBasedInitialRank) { // <--- MODIFIED PARAM NAME
         if (graph == null || graph.isEmpty()) {
             System.out.println("Graph is not initialized or empty. Cannot calculate PageRank.");
             return null;
         }
-        return graph.calculatePageRank(0.85, useTfBasedInitialRank);
+        // Pass the flag to the graph's PageRank method
+        return graph.calculatePageRank(0.85, useTfIdfBasedInitialRank); // <--- MODIFIED CALL
     }
 
+    // ... (randomWalk and saveGraphAsImage methods remain the same) ...
     /** Function 7: Random Walk */
     public static String randomWalk() {
         if (graph == null || graph.isEmpty()) {
@@ -544,4 +558,5 @@ public class Lab1 {
             }
         }
     }
-}
+
+} // End of Lab1 class
