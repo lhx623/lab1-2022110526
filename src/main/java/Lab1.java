@@ -1,4 +1,6 @@
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -10,15 +12,15 @@ import guru.nidi.graphviz.model.Node; // Use this specific Node
 import static guru.nidi.graphviz.model.Factory.*; // For graph creation methods
 
 public class Lab1 {
-
-    private static DirectedGraph graph;
+    private static final SecureRandom random = new SecureRandom();;
+    static DirectedGraph graph;
     // private static String originalTextContent; // Store preprocessed text if needed elsewhere
 
     // ... (main method and other parts up to handleCalcPageRank remain the same) ...
     public static void main(String[] args) {
         // --- 1. 获取输入文件路径 ---
         String filePath = "";
-        Scanner scanner = new Scanner(System.in); // Keep scanner open for menu
+        Scanner scanner = new Scanner(System.in, "UTF-8"); // Keep scanner open for menu
 
         if (args.length > 0) {
             filePath = args[0];
@@ -211,9 +213,10 @@ public class Lab1 {
 
 
     // --- 文件读取和预处理 (Same as before) ---
-    private static String readFileAndPreprocess(String filePath) throws IOException {
+    public static String readFileAndPreprocess(String filePath) throws IOException {
         StringBuilder content = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(filePath), "UTF-8"))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 content.append(line).append(" ");
@@ -226,7 +229,7 @@ public class Lab1 {
     }
 
     // --- 图构建 (Same as before) ---
-    private static DirectedGraph buildGraph(String text) {
+    public static DirectedGraph buildGraph(String text) {
         String[] words = text.split("\\s+");
         List<String> wordList = Arrays.stream(words)
                 .filter(s -> !s.isEmpty())
@@ -316,7 +319,6 @@ public class Lab1 {
         }
 
         StringBuilder newText = new StringBuilder();
-        Random random = new Random();
         newText.append(words[0]);
 
         for (int i = 0; i < words.length - 1; i++) {
@@ -459,7 +461,8 @@ public class Lab1 {
         walkPath.forEach(sj::add);
         String result = sj.toString();
         String filename = "random_walk_output.txt";
-        try (PrintWriter writer = new PrintWriter(new FileWriter(filename))) {
+        try (OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(filename), StandardCharsets.UTF_8);
+             java.io.PrintWriter writer = new java.io.PrintWriter(osw)) {
             writer.println(result);
             System.out.println("Random walk path saved to " + filename);
         } catch (IOException e) {
