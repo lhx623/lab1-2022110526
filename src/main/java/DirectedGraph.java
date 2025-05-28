@@ -1,9 +1,3 @@
-import java.io.FileWriter;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.security.SecureRandom;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -14,10 +8,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Random;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -26,7 +18,7 @@ import java.util.stream.Collectors;
  */
 
 class DirectedGraph {
-  private final Map<String, Map<String, Integer>> adjList;
+  final Map<String, Map<String, Integer>> adjList;
   private Map<String, Integer> nodeFrequencies;
   // Total words in the source text for TF/TF-IDF calculation
   private long totalWordCount;
@@ -244,8 +236,15 @@ class DirectedGraph {
   }
 
   // Recursive DFS helper for findAllShortestPaths - adapted to use distances
-  private void findAllPathsDFS(String u, String endNode, Map<String, Integer> distances, LinkedList<String> currentPath, List<List<String>> allPaths, int currentWeight, int targetWeight) {
-
+  private void findAllPathsDFS(
+          String u,
+          String endNode,
+          Map<String, Integer> distances,
+          LinkedList<String> currentPath,
+          List<List<String>> allPaths,
+          int currentWeight,
+          int targetWeight
+  ) {
     if (u.equals(endNode)) {
       if (currentWeight == targetWeight) { // Check if path length matches shortest
         allPaths.add(new ArrayList<>(currentPath));
@@ -262,9 +261,19 @@ class DirectedGraph {
       int edgeWeight = neighborEntry.getValue();
 
       // Explore neighbor 'v' only if it could potentially lead to *a* shortest path.
-      if (distances.get(u) != Integer.MAX_VALUE && distances.get(v) != Integer.MAX_VALUE && distances.get(u) + edgeWeight == distances.get(v)) {
+      if (distances.get(u) != Integer.MAX_VALUE
+              && distances.get(v) != Integer.MAX_VALUE
+              && distances.get(u) + edgeWeight == distances.get(v)) {
         currentPath.addLast(v);
-        findAllPathsDFS(v, endNode, distances, currentPath, allPaths, currentWeight + edgeWeight, targetWeight);
+        findAllPathsDFS(
+                v,
+                endNode,
+                distances,
+                currentPath,
+                allPaths,
+                currentWeight + edgeWeight,
+                targetWeight
+        );
         currentPath.removeLast(); // Backtrack
       }
     }
@@ -279,17 +288,19 @@ class DirectedGraph {
       return Collections.emptyMap();
     }
 
-    Map<String, ShortestPathResult> results = new HashMap<>();
+
     Map<String, Integer> distances = new HashMap<>();
-    Map<String, String> previousNodes = new HashMap<>();
-    PriorityQueue<Map.Entry<String, Integer>> pq = new PriorityQueue<>(Map.Entry.comparingByValue());
+
+    PriorityQueue<Map.Entry<String, Integer>> pq = new PriorityQueue<>(
+            Map.Entry.comparingByValue()
+    );
 
     for (String node : adjList.keySet()) {
       distances.put(node, Integer.MAX_VALUE);
     }
     distances.put(startNode, 0);
     pq.add(new AbstractMap.SimpleEntry<>(startNode, 0));
-
+    Map<String, String> previousNodes = new HashMap<>();
     while (!pq.isEmpty()) {
       Map.Entry<String, Integer> entry = pq.poll();
       String u = entry.getKey();
@@ -310,7 +321,7 @@ class DirectedGraph {
         }
       }
     }
-
+    Map<String, ShortestPathResult> results = new HashMap<>();
     // Reconstruct paths for all nodes
     for (String endNode : adjList.keySet()) {
       results.put(endNode, reconstructPath(startNode, endNode, distances, previousNodes));
@@ -319,7 +330,12 @@ class DirectedGraph {
   }
 
   // Helper method to reconstruct a single path from Dijkstra results
-  private ShortestPathResult reconstructPath(String startNode, String endNode, Map<String, Integer> distances, Map<String, String> previousNodes) {
+  private ShortestPathResult reconstructPath(
+          String startNode,
+          String endNode,
+          Map<String, Integer> distances,
+          Map<String, String> previousNodes
+  ) {
     LinkedList<String> path = new LinkedList<>();
     int length = distances.getOrDefault(endNode, Integer.MAX_VALUE);
 
@@ -330,7 +346,9 @@ class DirectedGraph {
     String current = endNode;
     while (current != null) {
       path.addFirst(current);
-      if (current.equals(startNode)) break; // Found start
+      if (current.equals(startNode)) {
+        break; // Found start
+      }
       current = previousNodes.get(current); // Go to previous
     }
 
@@ -351,13 +369,14 @@ class DirectedGraph {
     // 紧凑构造函数：自动验证和规范化参数
     public ShortestPathResult {
       // 对传入的path进行防御性复制
-      path = Collections.unmodifiableList(new ArrayList<>(path));
+      path = List.copyOf(path);
     }
 
     // 直接返回不可变列表（无需额外处理）
     public List<String> getPath() {
       return path;
     }
+
     public int getLength() {
       return length;
     }
@@ -370,35 +389,38 @@ class DirectedGraph {
       paths
               = paths.stream()
               .map(this::makeImmutableList)
-              .collect(Collectors.toUnmodifiableList());
+              .toList();
       // 这里虽然不能直接赋值给paths（record特性），但上述操作已修改了传入的paths内容
     }
 
     private List<String> makeImmutableList(List<String> list) {
-      return Collections.unmodifiableList(new ArrayList<>(list));
+      return List.copyOf(list);
     }
 
     public List<List<String>> getPaths() {
       // 直接返回经过处理后的不可变paths
-      return paths;
+      return List.copyOf(paths);
     }
 
     public int getLength() {
       return length;
     }
   }
-
-
   // --- PageRank Implementation ---
-
   /**
      * Calculates PageRank using iteration. Allows uniform or TF-IDF-based initial rank.
      *
      * @param dampingFactor            The damping factor (typically 0.85).
-     * @param useTfIdfBasedInitialRank If true, initializes ranks based on TF-IDF; otherwise, uses uniform initialization.
+     * @param useTfIdfBasedInitialRank If true,
+   *                                 *initializes ranks based on TF-IDF;
+   *                                  otherwise, uses uniform initialization.
      * @return A map where keys are node names (words) and values are their PageRank scores.
      */
-  public Map<String, Double> calculatePageRank(double dampingFactor, boolean useTfIdfBasedInitialRank) {
+
+  public Map<String, Double> calculatePageRank(
+          double dampingFactor,
+          boolean useTfIdfBasedInitialRank
+  ) {
     Map<String, Double> ranks = new HashMap<>();
     Map<String, Integer> outDegree = new HashMap<>();
     Set<String> nodes = getNodes();
@@ -406,7 +428,6 @@ class DirectedGraph {
     if (n == 0) {
       return ranks;
     }
-
     // Initialize ranks based on the chosen method (Uniform or TF-IDF)
     initializeRanks(ranks, n, useTfIdfBasedInitialRank); // <--- MODIFIED CALL
 
@@ -414,16 +435,13 @@ class DirectedGraph {
     for (String node : nodes) {
       outDegree.put(node, getNeighbors(node).size());
     }
-
     Map<String, Double> newRanks = new HashMap<>();
     double epsilon = 1e-6;         // Convergence threshold
     int maxIterations = 100;
     int iteration = 0;
-
     while (iteration++ < maxIterations) {
       double delta = 0.0; // Sum of changes in this iteration
       double sinkSum = 0.0; // Sum of ranks of sink nodes (out-degree 0)
-
       // Calculate the contribution from sink nodes (nodes with no outgoing links)
       // This ensures their rank is distributed among all nodes
       for (String node : nodes) {
@@ -431,10 +449,8 @@ class DirectedGraph {
           sinkSum += ranks.get(node);
         }
       }
-
       for (String node : nodes) {
         double incomingRankSum = 0.0;
-
         // Sum ranks from nodes pointing to the current node
         for (String other : nodes) {
           // Check if 'other' node points to the current 'node'
@@ -445,17 +461,17 @@ class DirectedGraph {
             }
           }
         }
-
         // PageRank formula: (1-d)/N + d * (Sum(IncomingPR/OutgoingLinks) + SinkSum/N)
-        double newRank = (1 - dampingFactor) / n + dampingFactor * (incomingRankSum + sinkSum / n); // Distribute sink rank equally
-
+        double newRank = (1 - dampingFactor) / n
+                + dampingFactor * (
+                incomingRankSum
+                        + sinkSum / n
+        );
         newRanks.put(node, newRank);
         delta += Math.abs(newRank - ranks.get(node));
       }
-
       // Update ranks for the next iteration
       ranks.putAll(newRanks);
-
       // Check for convergence
       if (delta < epsilon) {
         System.out.println("PageRank converged after " + iteration + " iterations.");
@@ -465,10 +481,8 @@ class DirectedGraph {
     if (iteration >= maxIterations) {
       System.out.println("PageRank did not converge within " + maxIterations + " iterations.");
     }
-
     return ranks;
   }
-
 
   // Helper: Initialize ranks (Uniform or TF-IDF based)
   private void initializeRanks(Map<String, Double> ranks, int n, boolean useTfIdf) {
@@ -483,13 +497,8 @@ class DirectedGraph {
         if (frequency == 0) {
           continue; // Should not happen for nodes in getNodes() if populated correctly
         }
-
-        // Calculate TF (Term Frequency)
         double tf = (double) frequency / totalWordCount;
-
-        // Calculate IDF (Inverse Document Frequency - Local Heuristic)
-        // log(TotalTerms / (TermFrequency + 1))
-        double idf = Math.log((double) totalWordCount / (frequency + 1.0)); // Add 1 to freq to avoid log(inf) or div by zero
+        double idf = Math.log((double) totalWordCount / (frequency + 1.0));
 
         // Calculate TF-IDF
         double tfIdfScore = tf * idf;
@@ -507,39 +516,49 @@ class DirectedGraph {
         System.out.println("Initialized PageRank using TF-IDF (single-document heuristic).");
         return; // Exit after successful TF-IDF initialization
       } else {
-        System.out.println("Warning: TF-IDF sum was zero or negative (check frequencies/total count). Falling back to uniform initial PageRank.");
+        System.out.println(
+                "Warning: TF-IDF sum was zero or negative "
+                        +
+                        "(check frequencies/total count). "
+                        +
+                        "Falling back to uniform initial PageRank."
+        );
       }
     }
-
-    // Default or Fallback: Uniform initialization
     System.out.println("Using uniform initial PageRank.");
     double initialRank = 1.0 / n;
     for (String node : getNodes()) {
       ranks.put(node, initialRank);
     }
     // Add a warning if TF-IDF was requested but couldn't be used
-    if (useTfIdf && !(totalWordCount > 0 && nodeFrequencies != null && !nodeFrequencies.isEmpty())) {
-      System.out.println("Warning: Could not use TF-IDF-based initial rank (totalWordCount or frequencies missing). Using uniform.");
+    if (useTfIdf
+            && !(totalWordCount > 0
+            && nodeFrequencies != null
+            && !nodeFrequencies.isEmpty())
+    ) {
+      System.out.println(
+              "Warning: Could not use TF-IDF-based initial rank "
+                      +
+                      "(totalWordCount or frequencies missing). "
+                      +
+                      "Using uniform."
+      );
     }
   }
-
-
-  // --- Random Walk Implementation ---
-  // ... (Random Walk method remains unchanged) ...
 
   /**
      * Performs a random walk until an edge is repeated or a dead end is hit.
      */
   public List<String> performRandomWalk() {
     List<String> pathNodes = new ArrayList<>();
-    Set<String> visitedEdges = new HashSet<>(); // Store edges as "node1->node2"
+
     SecureRandom random = new SecureRandom();
 
 
     if (adjList.isEmpty()) {
       return pathNodes;
     }
-
+    Set<String> visitedEdges = new HashSet<>(); // Store edges as "node1->node2"
     List<String> nodesList = new ArrayList<>(adjList.keySet());
     if (nodesList.isEmpty()) {
       return pathNodes;
@@ -562,7 +581,6 @@ class DirectedGraph {
 
       if (!visitedEdges.add(edge)) { // add returns false if element already exists
         // Edge repeated
-        pathNodes.add(nextNode); // Add the node that completes the repeated edge
         break;
       }
 
@@ -596,7 +614,9 @@ class DirectedGraph {
   private String generateStringRepresentation(Set<String> markedNodes, Set<String> markedEdges) {
     StringBuilder sb = new StringBuilder();
     // Sort nodes for consistent output
-    List<String> sortedNodes = adjList.keySet().stream().sorted().collect(Collectors.toList());
+    List<String> sortedNodes = adjList.keySet().stream()
+            .sorted()
+            .toList();
 
     for (String node : sortedNodes) {
       String nodeMarker = markedNodes.contains(node) ? "***" : "";
@@ -604,7 +624,10 @@ class DirectedGraph {
 
       Map<String, Integer> neighbors = getNeighbors(node);
       // Sort neighbors for consistent output
-      List<String> sortedNeighbors = neighbors.keySet().stream().sorted().collect(Collectors.toList());
+      List<String> sortedNeighbors = neighbors.keySet()
+              .stream()
+              .sorted()
+              .toList();
 
       StringJoiner sj = new StringJoiner(", ");
       for (String neighbor : sortedNeighbors) {
@@ -612,7 +635,7 @@ class DirectedGraph {
         String edgeMarker = markedEdges.contains(edge) ? "***" : "";
         sj.add(edgeMarker + neighbor + "(" + neighbors.get(neighbor) + ")" + edgeMarker);
       }
-      sb.append(sj.toString()).append("}\n");
+      sb.append(sj).append("}\n");
     }
     if (sortedNodes.isEmpty()) {
       sb.append("(Graph is empty)\n");
@@ -620,42 +643,4 @@ class DirectedGraph {
     return sb.toString();
   }
 
-  /**
-     * Optional: Generates a DOT file representation for Graphviz.
-     */
-  public void generateDotFile(String filename) throws IOException {
-    // Use try-with-resources for automatic closing
-    try (OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(filename), StandardCharsets.UTF_8);
-         PrintWriter writer = new PrintWriter(osw, true)) {
-      writer.println("digraph G {");
-      writer.println("  rankdir=LR;"); // Layout direction
-      writer.println("  node [shape=ellipse, style=filled, color=lightblue];"); // Node style
-      writer.println("  edge [color=gray];"); // Edge style
-
-      List<String> sortedNodes = adjList.keySet().stream().sorted().collect(Collectors.toList());
-
-      for (String sourceNode : sortedNodes) {
-        // Write node definition even if it has no outgoing edges listed explicitly below
-        writer.println("  \"" + escapeDot(sourceNode) + "\";");
-
-        Map<String, Integer> neighbors = getNeighbors(sourceNode);
-        List<String> sortedNeighbors = neighbors.keySet().stream().sorted().collect(Collectors.toList());
-
-        for (String destNode : sortedNeighbors) {
-          int weight = neighbors.get(destNode);
-          writer.println("  \"" + escapeDot(sourceNode) + "\" -> \"" + escapeDot(destNode) + "\" [label=\"" + weight + "\", weight=" + weight + "];"); // Add edge weight for layout hint
-        }
-      }
-      writer.println("}");
-    } catch (IOException e) {
-      e.printStackTrace();
-      // 这里可以添加更合适的异常处理逻辑
-    }
-  }
-
-  // Helper to escape strings for DOT format
-  private String escapeDot(String s) {
-    // Basic escaping for quotes. More complex escaping might be needed for other special chars.
-    return s.replace("\"", "\\\"");
-  }
 }
